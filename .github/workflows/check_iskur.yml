@@ -1,0 +1,56 @@
+name: Atatürk Üniversitesi İŞKUR Kura Takip ve WhatsApp Bildirim
+
+on:
+  schedule:
+    # Her 10 dakikada bir otomatik çalışır (7/24 Bulut Üzerinde)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'WhatsApp test mesajı gönderilsin mi?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Depoyu İndir (Checkout)
+        uses: actions/checkout@v4
+
+      - name: Python Kurulumu
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Duyuruları Kontrol Et ve Bildirim Gönder
+        env:
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          GREENAPI_INSTANCE_ID: ${{ secrets.GREENAPI_INSTANCE_ID }}
+          GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+            python notifier.py --test
+          else
+            python notifier.py
+          fi
+
+      - name: Gönderilen Duyuruları Kaydet (Tekrar Mesaj Atmamak İçin)
+        if: ${{ github.event.inputs.test_mode != 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_items.json
+          git diff --staged --quiet || (git commit -m "chore: seen_items.json güncellendi [skip ci]" && git push)
